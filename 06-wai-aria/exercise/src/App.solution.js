@@ -1,300 +1,135 @@
-/* eslint-disable jsx-a11y/aria-activedescendant-has-tabindex  */
-/* eslint-disable jsx-a11y/role-has-required-aria-props  */
-/* eslint-disable react/no-direct-mutation-state  */
-import React from "react";
-import { createPortal } from "react-dom";
-import PropTypes from "prop-types";
-import Rect from "@reach/rect";
+/*
 
-class Portal extends React.Component {
-  state = {
-    mounted: false
-  };
+Follow the WAI ARIA Radio Group example at:
+https://www.w3.org/TR/wai-aria-practices-1.1/examples/radio/radio-1/radio-1.html
 
-  componentDidMount() {
-    this.node = document.createElement("div");
-    document.body.appendChild(this.node);
-    this.setState({ mounted: true });
-  }
+- Turn the span into a button to get keyboard and focus events
+- Use tabIndex to allow only the active button to be tabbable
+- Use left/right arrows to select the next/previous radio button
+  - Tip: you can figure out the next value with React.Children.forEach(fn),
+    or React.Children.toArray(children).reduce(fn)
+- Move the focus in cDU to the newly selected item
+  - Tip: do it in RadioOption not RadioGroup
+  - Tip: you'll need a ref
+- Add the aria attributes
+  - radiogroup
+  - radio
+  - aria-checked
+  - aria-label on the icons
 
-  componentWillUnmount() {
-    document.body.removeChild(this.node);
-  }
+*/
+import React, { Component } from "react";
+import FaPlay from "react-icons/lib/fa/play";
+import FaPause from "react-icons/lib/fa/pause";
+import FaForward from "react-icons/lib/fa/forward";
+import FaBackward from "react-icons/lib/fa/backward";
 
-  render() {
-    return this.state.mounted
-      ? createPortal(this.props.children, this.node)
-      : null;
-  }
+function findNextValue(children, currentValue) {
+  return React.Children.toArray(children).reduce(
+    (nextValue, child, index, array) => {
+      if (child.props.value === currentValue) {
+        let nextIndex = index === array.length - 1 ? 0 : index + 1;
+        return array[nextIndex].props.value;
+      }
+      return nextValue;
+    },
+    null
+  );
 }
 
-const findSelectionIndex = (children, value) => {
-  let preSelectionIndex = -1;
-  React.Children.forEach(children, (child, index) => {
-    if (child.props.value === value) {
-      preSelectionIndex = index;
-    }
-  });
-  return preSelectionIndex;
-};
+function findPrevValue(children, currentValue) {
+  return React.Children.toArray(children).reduce(
+    (nextValue, child, index, array) => {
+      if (child.props.value === currentValue) {
+        let nextIndex = index === 0 ? array.length - 1 : index - 1;
+        return array[nextIndex].props.value;
+      }
+      return nextValue;
+    },
+    null
+  );
+}
 
-const findValueFromIndex = (children, preSelectionIndex) => {
-  let value;
-  React.Children.forEach(children, (child, index) => {
-    if (index === preSelectionIndex) {
-      value = child.props.value;
-    }
-  });
-  return value;
-};
-
-class Select extends React.Component {
-  static propTypes = {
-    onChange: PropTypes.func,
-    value: PropTypes.any,
-    defaultValue: PropTypes.any
-  };
-
+class RadioGroup extends Component {
   state = {
-    value: this.props.defaultValue,
-    isOpen: false,
-    preSelectionIndex: findSelectionIndex(
-      this.props.children,
-      this.props.defaultValue
-    ),
-    refs: {
-      list: null,
-      button: null
-    }
-  };
-
-  rootId = Math.random()
-    .toString(32)
-    .substr(2, 8);
-
-  open = index => {
-    this.setState({
-      isOpen: true,
-      preSelectionIndex:
-        index != null
-          ? index
-          : findSelectionIndex(
-              this.props.children,
-              this.isControlled() ? this.props.value : this.state.value
-            )
-    });
-  };
-
-  isControlled() {
-    return this.props.value != null;
-  }
-
-  handleListBlur = () => {
-    this.setState({ isOpen: false });
-  };
-
-  handleButtonKeyDown = event => {
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault();
-      this.open();
-    }
-  };
-
-  handleListKeyDown = event => {
-    const prevent = ["Tab", "ArrowDown", "ArrowUp"];
-
-    if (prevent.includes(event.key)) {
-      event.preventDefault();
-    }
-
-    if (event.key === "ArrowDown") {
-      const { preSelectionIndex } = this.state;
-      const { children } = this.props;
-      let nextIndex = preSelectionIndex + 1;
-      if (nextIndex < React.Children.count(children)) {
-        this.setState({ preSelectionIndex: nextIndex });
-      }
-    }
-
-    if (event.key === "ArrowUp") {
-      const { preSelectionIndex } = this.state;
-      let nextIndex = preSelectionIndex - 1;
-      if (nextIndex !== -1) {
-        this.setState({ preSelectionIndex: nextIndex });
-      }
-    }
-
-    if (event.key === "Enter") {
-      event.preventDefault();
-      this.selectAndClose();
-    }
-
-    if (event.key === "Escape") {
-      this.setState({ isOpen: false });
-    }
-  };
-
-  componentDidUpdate(prevProps, prevState) {
-    if (prevState.isOpen && !this.state.isOpen) {
-      this.state.refs.button.focus();
-    } else if (this.state.isOpen && !prevState.isOpen) {
-      this.state.refs.list.focus();
-    }
-  }
-
-  selectAndClose = () => {
-    const { preSelectionIndex } = this.state;
-    const value = findValueFromIndex(this.props.children, preSelectionIndex);
-    if (this.props.onChange) {
-      this.props.onChange(value);
-    }
-    this.setState({
-      value: this.isControlled() ? undefined : value,
-      isOpen: false
-    });
+    value: this.props.defaultValue
   };
 
   render() {
-    const { labelledby } = this.props;
-    const { isOpen, preSelectionIndex } = this.state;
-    const { rootId } = this;
-    let label;
-    let activedescendant;
-    const children = React.Children.map(this.props.children, (child, index) => {
-      // side effect in a map
-      const { value } = this.isControlled() ? this.props : this.state;
-      const id = child.props.id || `${rootId}-${index}`;
-      const isSelected = child.props.value === value;
-      const isSelectionIndex = index === preSelectionIndex;
-
-      if (isSelected) {
-        label = child.props.children;
-      }
-
-      if (isSelectionIndex) {
-        activedescendant = id;
-      }
-
+    const children = React.Children.map(this.props.children, child => {
       return React.cloneElement(child, {
-        id,
-        isSelected,
-        isSelectionIndex,
-        onPreSelect: () => {
-          if (!isSelectionIndex) {
-            this.setState({ preSelectionIndex: index });
-          }
-        },
-        onSelect: this.selectAndClose
+        isActive: child.props.value === this.state.value,
+        onSelect: () => this.setState({ value: child.props.value })
       });
     });
-
     return (
-      <Rect>
-        {({ rect, ref }) => (
-          <div className="select">
-            <button
-              ref={node => {
-                this.state.refs.button = node;
-                ref(node);
-              }}
-              className="label"
-              aria-haspopup="true"
-              aria-expanded={isOpen}
-              aria-labelledby={labelledby}
-              onClick={() => {
-                // don't like the flash when the mouseMove hits on click,
-                // so we send 0 in
-                this.open(0);
-              }}
-              onKeyDown={this.handleButtonKeyDown}
-            >
-              {label}
-              <span className="arrow" aria-hidden="true">
-                {" "}
-                ▾
-              </span>
-            </button>
-            {isOpen && (
-              <ul
-                ref={n => (this.state.refs.list = n)}
-                className="options"
-                style={{
-                  position: "absolute",
-                  top: rect.top,
-                  left: rect.left
-                }}
-                role="listbox"
-                tabIndex="-1"
-                aria-labelledby={labelledby}
-                aria-activedescendant={activedescendant}
-                onBlur={this.handleListBlur}
-                onKeyDown={this.handleListKeyDown}
-              >
-                {children}
-              </ul>
-            )}
-          </div>
-        )}
-      </Rect>
+      <fieldset
+        role="radiogroup"
+        className="radio-group"
+        onKeyDown={event => {
+          if (event.key === "ArrowRight") {
+            this.setState({
+              value: findNextValue(this.props.children, this.state.value)
+            });
+          } else if (event.key === "ArrowLeft") {
+            this.setState({
+              value: findPrevValue(this.props.children, this.state.value)
+            });
+          }
+        }}
+      >
+        <legend>{this.props.legend}</legend>
+        {children}
+      </fieldset>
     );
   }
 }
 
-class Option extends React.Component {
+class RadioButton extends Component {
+  node = React.createRef();
+
+  componentDidUpdate(prevProps) {
+    if (!prevProps.isActive && this.props.isActive) {
+      this.node.current.focus();
+    }
+  }
+
   render() {
-    const {
-      id,
-      isSelected,
-      isSelectionIndex,
-      onSelect,
-      onPreSelect
-    } = this.props;
+    const { isActive, onSelect } = this.props;
+    const className = "radio-button " + (isActive ? "active" : "");
     return (
-      <li
-        role="option"
-        id={id}
-        className={[
-          "option",
-          isSelected ? "selected" : "",
-          isSelectionIndex ? "pre-selection" : ""
-        ].join(" ")}
+      <button
+        role="radio"
+        aria-checked={isActive}
+        ref={this.node}
+        tabIndex={isActive ? "0" : "-1"}
+        className={className}
         onClick={onSelect}
-        onMouseMove={
-          // mouseMove instead of mouseEnter so switching from
-          // keyboard to mouse works w/o having to leave and enter
-          // the element to trigger selection
-          onPreSelect
-        }
       >
         {this.props.children}
-      </li>
+      </button>
     );
   }
 }
 
-class App extends React.Component {
-  state = {
-    selectValue: "dosa"
-  };
-
-  setToMintChutney = () => {
-    this.setState({
-      selectValue: "mint-chutney"
-    });
-  };
-
+class App extends Component {
   render() {
     return (
-      <div className="app">
-        <div className="block">
-          <h2 id="title">WAI-ARIA</h2>
-          <Select defaultValue="tikka-masala" labelledby="title">
-            <Option value="tikka-masala">Tikka Masala</Option>
-            <Option value="tandoori-chicken">Tandoori Chicken</Option>
-            <Option value="dosa">Dosa</Option>
-            <Option value="mint-chutney">Mint Chutney</Option>
-          </Select>
-        </div>
+      <div>
+        <RadioGroup defaultValue="pause" legend="Car Radio Controls">
+          <RadioButton value="back">
+            <FaBackward aria-label="Back" />
+          </RadioButton>
+          <RadioButton value="play">
+            <FaPlay aria-label="Play" />
+          </RadioButton>
+          <RadioButton value="pause">
+            <FaPause aria-label="Pause" />
+          </RadioButton>
+          <RadioButton value="forward">
+            <FaForward aria-label="Forward" />
+          </RadioButton>
+        </RadioGroup>
       </div>
     );
   }
