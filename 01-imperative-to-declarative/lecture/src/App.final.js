@@ -2,13 +2,17 @@ import React from "react";
 import createOscillator from "./lib/createOscillator";
 import SineWave from "./lib/SineWave";
 
+// go for this:  `ui = fn(state)`  by removing time from your code
+
 class Tone extends React.Component {
   oscillator = createOscillator();
 
+  // This is to sync state with some other imperative API
   componentDidMount() {
     this.doImperativeStuff();
   }
 
+  // This will also allow you to sync state with other imperative APIs
   componentDidUpdate() {
     this.doImperativeStuff();
   }

@@ -18,6 +18,21 @@ Tips:
 
 import React, { Component } from "react";
 
+class DocumentTitle extends Component {
+  componentDidMount() {
+    this.syncTitle();
+  }
+  componentDidUpdate() {
+    this.syncTitle();
+  }
+  syncTitle = () => {
+    document.title = this.props.children;
+  }
+  render() {
+    return null;
+  }
+}
+
 class App extends Component {
   state = {
     completed: 0,
@@ -30,6 +45,7 @@ class App extends Component {
 
     return (
       <div className="app">
+        <DocumentTitle>{`Todos (${incomplete})`}</DocumentTitle>
         <h1>Todos ({incomplete})</h1>
 
         <form

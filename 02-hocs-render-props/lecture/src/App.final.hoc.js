@@ -4,6 +4,8 @@ import Map from "./lib/Map";
 
 let withGeo = Comp =>
   class GeoPosition extends React.Component {
+    // also nice for console purposes
+    static displayName = `withGeolocation(${Comp.displayName || Comp.name})`;
     state = {
       coords: null,
       error: null
