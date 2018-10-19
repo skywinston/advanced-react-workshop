@@ -1,6 +1,6 @@
 import React, { Placeholder } from "react";
 import "./lib/index.css";
-import App from "./App.start";
+import App from "./App.sky";
 import { unstable_createRoot } from "react-dom";
 
 unstable_createRoot(document.getElementById("root")).render(

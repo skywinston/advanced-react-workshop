@@ -1,131 +1,133 @@
-import React from "react";
-import { createPortal } from "react-dom";
-import PropTypes from "prop-types";
-import Rect from "@reach/rect";
+/*
 
-class Portal extends React.Component {
+Follow the WAI ARIA Radio Group example at:
+https://www.w3.org/TR/wai-aria-practices-1.1/examples/radio/radio-1/radio-1.html
+
+- Turn the span into a button to get keyboard and focus events
+- Use tabIndex to allow only the active button to be tabbable
+- Use left/right arrows to select the next/previous radio button
+  - Tip: you can figure out the next value with React.Children.forEach(fn),
+    or React.Children.toArray(children).reduce(fn)
+- Move the focus in cDU to the newly selected item
+  - Tip: do it in RadioOption not RadioGroup
+  - Tip: you'll need a ref
+- Add the aria attributes
+  - radiogroup
+  - radio
+  - aria-checked
+  - aria-label on the icons
+
+*/
+import React, { Component } from "react";
+import FaPlay from "react-icons/lib/fa/play";
+import FaPause from "react-icons/lib/fa/pause";
+import FaForward from "react-icons/lib/fa/forward";
+import FaBackward from "react-icons/lib/fa/backward";
+
+class RadioGroup extends Component {
   state = {
-    mounted: false
+    value: this.props.defaultValue
   };
 
-  componentDidMount() {
-    this.node = document.createElement("div");
-    document.body.appendChild(this.node);
-    this.setState({ mounted: true });
+  handleKeyDown = event => {
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      this.setState({ value: this.findNextValue() })
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      this.setState({ value: this.findPreviousValue() })
+    }
   }
 
-  componentWillUnmount() {
-    document.body.removeChild(this.node);
+  findNextValue = () => {
+    let childArray = React.Children.toArray(this.props.children);
+    let currentIndex = childArray.findIndex(child => child.props.value === this.state.value);
+    let nextIndex;
+    if (currentIndex === React.Children.count(this.props.children) - 1) {
+      nextIndex = 0
+    } else {
+      nextIndex = currentIndex + 1;
+    }
+    return childArray[nextIndex].props.value;
+  };
+  
+  findPreviousValue = () => {
+    let childArray = React.Children.toArray(this.props.children);
+    let currentIndex = childArray.findIndex(child => child.props.value === this.state.value);
+    let nextIndex;
+    if (currentIndex === 0) {
+      nextIndex = React.Children.count(this.props.children) - 1;
+    } else {
+      nextIndex = currentIndex - 1;
+    }
+    return childArray[nextIndex].props.value;
   }
 
   render() {
-    return this.state.mounted
-      ? createPortal(this.props.children, this.node)
-      : null;
-  }
-}
-
-class Select extends React.Component {
-  static propTypes = {
-    onChange: PropTypes.func,
-    value: PropTypes.any,
-    defaultValue: PropTypes.any
-  };
-
-  state = {
-    value: this.props.defaultValue,
-    isOpen: false
-  };
-
-  handleToggle = () => {
-    this.setState({
-      isOpen: !this.state.isOpen
-    });
-  };
-
-  isControlled() {
-    return this.props.value != null;
-  }
-
-  render() {
-    const { isOpen } = this.state;
-    let label;
     const children = React.Children.map(this.props.children, child => {
-      const { value } = this.isControlled() ? this.props : this.state;
-      if (child.props.value === value) {
-        label = child.props.children;
-      }
-
       return React.cloneElement(child, {
-        onSelect: () => {
-          if (this.isControlled()) {
-            this.props.onChange(child.props.value);
-          } else {
-            this.setState({ value: child.props.value });
-          }
-        }
+        isActive: child.props.value === this.state.value,
+        onSelect: () => this.setState({ value: child.props.value })
       });
     });
-
     return (
-      <Rect>
-        {({ rect, ref }) => (
-          <div onClick={this.handleToggle} className="select">
-            <button ref={ref} className="label">
-              {label} <span className="arrow">▾</span>
-            </button>
-            {isOpen && (
-              <ul
-                style={{
-                  position: "absolute",
-                  top: rect.top,
-                  left: rect.left
-                }}
-                className="options"
-              >
-                {children}
-              </ul>
-            )}
-          </div>
-        )}
-      </Rect>
+      <fieldset className="radio-group" onKeyDown={this.handleKeyDown}>
+        <legend>{this.props.legend}</legend>
+        {children}
+      </fieldset>
     );
   }
 }
 
-class Option extends React.Component {
+class RadioButton extends Component {
+  buttonRef = React.createRef();
+
+  componentDidMount() {
+    if (this.props.isActive) {
+      this.buttonRef.current.focus();
+    }
+  }
+
+  componentDidUpdate(prevProps) {
+    if (!prevProps.isActive && this.props.isActive) {
+      this.buttonRef.current.focus();
+    }
+  }
+
   render() {
+    const { isActive, onSelect } = this.props;
+    const className = "radio-button " + (isActive ? "active" : "");
     return (
-      <li className="option" onClick={this.props.onSelect}>
+      <button 
+        ref={this.buttonRef} 
+        className={className} 
+        onClick={onSelect} 
+        role="radio" 
+        tabIndex={isActive ? 0 : -1} 
+        aria-checked={isActive}
+      >
         {this.props.children}
-      </li>
+      </button>
     );
   }
 }
 
-class App extends React.Component {
-  state = {
-    selectValue: "dosa"
-  };
-
-  setToMintChutney = () => {
-    this.setState({
-      selectValue: "mint-chutney"
-    });
-  };
-
+class App extends Component {
   render() {
     return (
-      <div className="app">
-        <div className="block">
-          <h2>WAI-ARIA</h2>
-          <Select defaultValue="tikka-masala">
-            <Option value="tikka-masala">Tikka Masala</Option>
-            <Option value="tandoori-chicken">Tandoori Chicken</Option>
-            <Option value="dosa">Dosa</Option>
-            <Option value="mint-chutney">Mint Chutney</Option>
-          </Select>
-        </div>
+      <div>
+        <RadioGroup defaultValue="pause" legend="Radio Group" role="radiogroup">
+          <RadioButton value="back">
+            <FaBackward aria-label="Back" />
+          </RadioButton>
+          <RadioButton value="play">
+            <FaPlay aria-label="Play" />
+          </RadioButton>
+          <RadioButton value="pause">
+            <FaPause aria-label="Play" />
+          </RadioButton>
+          <RadioButton value="forward">
+            <FaForward aria-label="Forward" />
+          </RadioButton>
+        </RadioGroup>
       </div>
     );
   }
